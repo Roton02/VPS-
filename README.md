@@ -1,271 +1,295 @@
-# VPS SETUP
+# 🛡️ Secure Node.js & Next.js Deployment on VPS
 
-### STEP 1
-<pre><code id="example-code">ssh root@your_ip_adress</code></pre>
-Then enter your password
+This README provides an **A–Z, production-ready, security-first** guide to deploy **Node.js (Backend)** and **Next.js (Frontend)** on a **fresh VPS** using **NGINX, PM2, Firewall, Rate Limiting, and SSL**.
 
-### STEP 2
-Updated backdated packges
-<pre><code id="example-code">sudo apt update</code></pre>
-<pre><code id="example-code">sudo apt upgrade</code></pre>
+> ✅ Designed to **prevent crypto-miner & bot attacks**
+> ✅ Node ports are **never exposed publicly**
+> ✅ Suitable for GitHub documentation
 
-### STEP 3
-Enabling and Configuring UFW (Uncomplicated Firewall)
+---
 
-<pre><code id="example-code">sudo apt install ufw -y (if debian first install ufw)</code></pre>
-<pre><code id="example-code">sudo ufw enable</code></pre>
-<pre><code id="example-code">sudo ufw allow 22</code></pre>
+## 📌 Prerequisites
 
-Check allow port status 
+* Fresh VPS (Ubuntu **22.04 LTS** recommended)
+* Root SSH access
+* Domain name (e.g. `example.com`, `api.example.com`)
 
-<pre><code id="example-code">sudo ufw status</code></pre>
+---
 
-### STEP 3
-Install NVM & Node.js
+## 🔐 STEP 1: SSH into VPS
 
-<pre><code id="example-code">curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash</code></pre>
-<pre><code id="example-code">nvm -v</code></pre>
-<pre><code id="example-code">nvm install --lts</code></pre>
-<pre><code id="example-code">nvm install 18.17.1 (for specific version)</code></pre>
-<pre><code id="example-code">node -v</code></pre>
-<pre><code id="example-code">node -v</code></pre>
-<pre><code id="example-code">npm -v</code></pre>
-Note: If version not showing please close the terminal and try again
+```bash
+ssh root@YOUR_SERVER_IP
+# Enter root password
+```
 
-## STEP 4
-git hub connection 
-<pre><code id="example-code">ls -al ~/.ssh</code></pre>
-<pre><code id="example-code">ssh-keygen -t rsa -b 4096 -C "github@smtech24.com"</code></pre>
-<pre><code id="example-code">eval "$(ssh-agent -s)"</code></pre>
-<pre><code id="example-code">cat ~/.ssh/id_rsa.pub</code></pre>
-Then copy the ssh key and pas it on your SSH and GPG kesy on your git hub clik new ssh key and write project name and past the key
+---
 
-<pre><code id="example-code">ssh -T git@github.com</code></pre>
+## 🔄 STEP 2: Update System & Install Essentials
 
-### STEP 5
-Setup nginx 
-<pre>
-  <code id="example-code">
-    sudo ufw allow 80/tcp
-    sudo ufw allow 3000
-    sudo ufw allow 443/tcp
-    sudo ufw reload
-    sudo apt install nginx -y
-    sudo systemctl status nginx
-    sudo systemctl start nginx
-    sudo systemctl enable nginx
-    sudo ufw allow 'Nginx Full'
-    sudo ufw enable
-  </code>
-</pre>
+```bash
+sudo apt update && sudo apt upgrade -y
+sudo apt install ufw git curl build-essential -y
+```
 
-### STEP 6
-Configure nginx 
-<pre>
-  <code id="example-code">
-    sudo nano /etc/nginx/sites-available/frontend-server
+---
 
-    #this is for next js
-    server {
+## 🔥 STEP 3: Firewall (VERY IMPORTANT)
+
+```bash
+sudo ufw reset
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow 22
+sudo ufw allow 80
+sudo ufw allow 443
+sudo ufw enable
+ufw status
+```
+
+✅ Only **22, 80, 443** must be allowed
+❌ **Never allow Node ports (3000, 5000, etc.)**
+
+---
+
+## 🛑 STEP 4: Install Fail2Ban (SSH Protection)
+
+```bash
+sudo apt install fail2ban -y
+sudo systemctl enable fail2ban
+sudo systemctl start fail2ban
+```
+
+---
+
+## 🟢 STEP 5: Install NVM, Node.js & PM2
+
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+source ~/.bashrc
+
+nvm install --lts
+node -v
+npm -v
+
+npm install -g pm2
+pm2 -v
+```
+
+---
+
+## 🔑 STEP 6: GitHub SSH Setup
+
+```bash
+ssh-keygen -t rsa -b 4096 -C "your_email@example.com"
+eval "$(ssh-agent -s)"
+cat ~/.ssh/id_rsa.pub
+```
+
+➡️ Add the key to **GitHub → Settings → SSH Keys**
+
+```bash
+ssh -T git@github.com
+```
+
+---
+
+## 📂 STEP 7: Project Directory Setup
+
+```bash
+sudo mkdir -p /var/www
+sudo chown -R $USER:$USER /var/www
+cd /var/www
+```
+
+---
+
+## ⚙️ STEP 8: Backend Setup (Node.js)
+
+```bash
+git clone <BACKEND_REPO_URL>
+cd backend
+npm install
+npx prisma generate
+npm run build
+```
+
+### ▶️ Run Backend (localhost only)
+
+```bash
+PORT=5000 HOST=127.0.0.1 pm2 start npm --name backend -- start --max-memory-restart 500M
+pm2 save
+```
+
+---
+
+## 🎨 STEP 9: Frontend Setup (Next.js)
+
+```bash
+cd /var/www
+git clone <FRONTEND_REPO_URL>
+cd frontend
+npm install
+npm run build
+```
+
+### ▶️ Run Frontend (localhost only)
+
+```bash
+pm2 start npm --name frontend -- start --max-memory-restart 500M
+pm2 save
+```
+
+---
+
+## 🌐 STEP 10: Install NGINX
+
+```bash
+sudo apt install nginx -y
+sudo systemctl enable nginx
+sudo systemctl start nginx
+```
+
+---
+
+## 🚦 STEP 11: Enable Rate Limiting (Global)
+
+Edit NGINX config:
+
+```bash
+sudo nano /etc/nginx/nginx.conf
+```
+
+Add inside `http {}` block:
+
+```nginx
+limit_req_zone $binary_remote_addr zone=global:10m rate=10r/s;
+```
+
+---
+
+## 🔁 STEP 12: NGINX Reverse Proxy Configuration
+
+### Frontend
+
+`/etc/nginx/sites-available/frontend`
+
+```nginx
+server {
     listen 80;
-    server_name yourdomain.com www.yourdomain.com;
+    server_name example.com www.example.com;
+
     location / {
-        proxy_pass http://localhost:3000; # Next.js runs on port 3000
+        limit_req zone=global burst=20 nodelay;
+        proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
+        proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-        }
     }
-    
-    sudo ln -s /etc/nginx/sites-available/frontend-server /etc/nginx/sites-enabled
-    sudo nginx -t
-    sudo systemctl reload nginx
-
-    #this is backend server setup
-    sudo nano /etc/nginx/sites-available/backend-server
-    server{
-        server_name test.com;
-
-        location / {
-            proxy_pass http://localhost:5002;
-            proxy_http_version 1.1;
-    
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection "upgrade";
-    
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-        }
-        client_max_body_size 3000M;
-    }
-    
-    sudo ln -s /etc/nginx/sites-available/backend-server /etc/nginx/sites-enabled
-    sudo nginx -t
-    sudo systemctl reload nginx
-  </code>
-</pre>
-
-## ⚙️ IF YOU ARE USING UBUNTU ON AWS – READ THIS FIRST!
-
-When you try to clone a private GitHub repository on an **AWS Ubuntu VPS**, you might face an authentication or permission error like this:
-
-```bash
-Cloning into 'test-nest-ws-cicd-dcker-postgree-backend'...
-git@github.com: Permission denied (publickey).
-fatal: Could not read from remote repository.
-
-Please make sure you have the correct access rights
-and the repository exists. 
-````
-🧩 Reason:
-By default, the /var/www directory is owned by root, so your ubuntu user doesn’t have permission to write or clone repositories there.
-
-✅ Solution:
-Run the following command to fix directory ownership and allow your ubuntu user to access it:
-
-```bash
-Copy code
-sudo chown -R ubuntu:ubuntu /var/www
+}
 ```
-This command changes the ownership of /var/www and gives your user permission to manage files inside it.
-Now you can safely clone your repository:
 
+### Backend
 
-### STEP 7
-Install Project & Setup
-<pre>
-  <code id="example-code">
-    git clone <git repository using ssh>
-    npm install
-    npm run build
-    npm run start
-    npm install -g pm2
-    pm2 --version
-      pm2 start npm --name "project-frontend" -- start (for next js frontend)
-      pm2 start dist/server.js --name project-backend (for backend)
-    pm2 list
-    pm2 startup
-    pm2 save
-    pm2 restart all (restart)
-      pm2 stop nextjs-app (stop server)
-      pm2 delete nextjs-app (delete server)
-  </code>
-</pre>
+`/etc/nginx/sites-available/backend`
 
-### STEP 8
-Install SSL
-<pre>
-  <code id="example-code">
-    sudo apt install certbot python3-certbot-nginx -y
-    sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
-  </code>
-</pre>
+```nginx
+server {
+    listen 80;
+    server_name api.example.com;
 
-INSTALL SSL FROM HOSTINGER
-<pre>
-For APT-based distributions (such as Debian or Ubuntu), run the following:
-<code id="example-code">
-sudo apt update
-sudo apt install python3 python3-venv libaugeas0
-</code>
-</pre>
+    location / {
+        limit_req zone=global burst=5 nodelay;
+        proxy_pass http://127.0.0.1:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
 
-<pre>
-Once it's ready, run the following to set up a Python virtual environment:
-<code id="example-code">
-sudo python3 -m venv /opt/certbot/
-sudo /opt/certbot/bin/pip install --upgrade pip
-</code>
-</pre>
+Enable configs:
 
-<pre>
-To install Certbot, this for NGINX:
-<code id="example-code">
-sudo /opt/certbot/bin/pip install certbot certbot-nginx
-</code>
-</pre>
+```bash
+sudo ln -s /etc/nginx/sites-available/frontend /etc/nginx/sites-enabled
+sudo ln -s /etc/nginx/sites-available/backend /etc/nginx/sites-enabled
+sudo nginx -t
+sudo systemctl reload nginx
+```
 
-<pre>
-Next, create a symbolic link so that Certbot can be executed from any path:
-<code id="example-code">
-sudo ln -s /opt/certbot/bin/certbot /usr/bin/certbot
-</code>
-</pre>
+---
 
-<pre>
-Install and activate SSL for your websites
-<code id="example-code">
-sudo certbot --nginx
-</code>
-</pre>
+## 🔐 STEP 13: SSL (Certbot)
 
+```bash
+sudo apt install certbot python3-certbot-nginx -y
+sudo certbot --nginx -d example.com -d www.example.com
+sudo certbot --nginx -d api.example.com
+```
 
-### STEP 9
-Install Mongodb with Prisma ORM (if Ubuntu version 22.04 needs Mongodb version 8.0 and if Ubuntu version 22.00 needs Mongodb version 6.0)
-  
-<pre>
-  ##for namecheap
-  <code>
-    sudo systemctl stop mongod
-    sudo apt-get purge mongodb-org*
-    sudo rm -r /var/log/mongodb
-    sudo rm -r /var/lib/mongodb
-  </code>
-  <code>
-    wget -qO - https://www.mongodb.org/static/pgp/server-4.4.asc | sudo apt-key add -
-    echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/4.4 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-4.4.list
-    sudo apt-get update
-    sudo apt-get install mongodb-org=4.4.8 mongodb-org-server=4.4.8 mongodb-org-shell=4.4.8 mongodb-org-mongos=4.4.8 mongodb-org-tools=4.4.8
-  </code>
-  <code>
-    sudo systemctl start mongod
-    sudo systemctl enable mongod
-    sudo systemctl status mongod
-  </code>
+---
 
-  
-  ##for other  vps provider
-  <code id="example-code">
-    sudo apt-get install gnupg curl
-  </code>
-  <code id="example-code">
-    curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | \
-   sudo gpg -o /usr/share/keyrings/mongodb-server-8.0.gpg \
-   --dearmor
-  </code>
-  <code id="example-code">
-    echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
-    if not work this use this command
-    echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu noble/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
-  </code>
+## 🔍 STEP 14: Security Verification
 
-  <code id="example-code">
-    sudo apt-get update
-    sudo apt-get install -y mongodb-org
-    sudo systemctl start mongod
-    sudo systemctl daemon-reload
-    sudo systemctl status mongod
-    sudo systemctl restart mongod
-    mongosh
+```bash
+ss -tulpn
+```
 
-    ##prisma replica setup
-    sudo nano /etc/mongod.conf
+Expected result:
 
-    replication:
-  replSetName: "rs0"
+```
+0.0.0.0:22
+0.0.0.0:80
+0.0.0.0:443
+127.0.0.1:3000
+127.0.0.1:5000
+```
 
-    sudo systemctl restart mongod (restart after replicate set config)
-    mongosh (enter mongodb)
-    rs.initiate() (replica set initiate)
-    rs.status() (check status)
-    ctrl + z (exit from mongosh)
-    sudo systemctl status mongod (ensure mongodb is running)
-    sudo ufw allow 27017 (allow 27017 port for mongodb localhost port)
-    sudo ufw reload
-    DATABASE_URL="mongodb://127.0.0.1:27017/lunatix?replicaSet=rs0"
-  </code>
-</pre>
+❌ If any Node port is on `0.0.0.0` → **INSECURE**
+
+---
+
+## 🔁 STEP 15: Rotate Secrets (IMPORTANT)
+
+* Database user & password
+* JWT secret
+* API keys
+* SMTP / third-party tokens
+
+---
+
+## 🔄 STEP 16: PM2 Auto Restart
+
+```bash
+pm2 startup
+pm2 save
+pm2 restart all --cron "0 4 * * *"
+```
+
+---
+
+## ☁️ OPTIONAL: Cloudflare (Highly Recommended)
+
+* Enable proxy (orange cloud)
+* Bot Fight Mode ON
+* Managed WAF ON
+* Rate limiting rules
+
+---
+
+## ✅ FINAL SECURITY RULES
+
+* 🚫 Never expose Node ports publicly
+* ✅ Only ports 22, 80, 443 are public
+* 🧱 All traffic goes through NGINX
+* 🚦 Rate limiting always enabled
+* 🔒 Rotate secrets after any breach
+
+---
+
+🎉 **Your VPS is now production-ready & secure.**
